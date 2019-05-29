@@ -1,0 +1,98 @@
+<#@ include file="PetaPoco.Core.ttinclude" #>
+<#
+	// Settings
+    ConnectionStringName = "postgres";			
+    Namespace = "";
+    RepoName = "";
+    GenerateOperations = true;
+	GeneratePocos = true;
+	GenerateCommon = true;
+	ClassPrefix = "";
+	ClassSuffix = "";
+	TrackModifiedColumns = false;
+	ExplicitColumns = true;
+	// �ų�ǰ׺
+	ExcludePrefix = new string[] {};
+	// ����ǰ׺
+	string[] IncludePrefix = new string[] {};
+	// ������
+	string[] IncludeTable = new string[] {};
+
+    // Read schema
+	Tables tempTables = LoadTables();
+
+/*
+	// Tweak Schema
+	tables["tablename"].Ignore = true;							// To ignore a table
+	tables["tablename"].ClassName = "newname";					// To change the class name of a table
+	tables["tablename"]["columnname"].Ignore = true;			// To ignore a column
+	tables["tablename"]["columnname"].PropertyName="newname";	// To change the property name of a column
+	tables["tablename"]["columnname"].PropertyType="bool";		// To change the property type of a column
+*/
+
+Tables tables = new Tables(); 
+
+// ָ������
+if (IncludeTable.Length != 0)
+	foreach(string entity in IncludeTable)
+		tables.AddRange(tempTables.Where(x => x.Name == entity));
+
+// ָ��ǰ׺
+if (IncludePrefix.Length != 0)
+	foreach(string prefix in IncludePrefix)
+		tables.AddRange(tempTables.Where(x => x.Name.StartsWith(prefix)));
+
+if (tables.Count() == 0)
+	tables = tempTables;
+
+foreach(Table tbl in tables)  
+    {  
+            //����������  
+            string srcStr = tbl.Name.ToLower(); 
+			// ���Ʋ�����_�Ͳ�����
+			if (!srcStr.Contains('_')) continue;
+            string newString = "";  
+            int first = 0;  
+            while (srcStr.IndexOf("_") != -1)  
+            {  
+                first = srcStr.IndexOf("_");  
+                if (first != srcStr.Length)  
+                {  
+                    newString = newString + srcStr.Substring(0, first);  
+                    srcStr = srcStr.Substring(first + 1);  
+                    srcStr = srcStr.Substring(0, 1).ToUpper() + srcStr.Substring(1);  
+                }  
+            }  
+            newString = newString + srcStr;  
+
+            tables[tbl.Name].ClassName =ClassPrefix+newString.Substring(0, 1).ToUpper() + newString.Substring(1)+ClassSuffix;
+            //�����ֶ�����
+            foreach(Column col in from c in tbl.Columns select c)
+            {
+                if(col.Name.StartsWith("_"))
+                {
+                    tables[tbl.Name][col.Name].Ignore=true; 
+                }
+                string srcStrCol = col.Name.ToLower();
+                string newStringCol = "";
+                int firstCol = 0;
+                while (srcStrCol.IndexOf("_") != -1)
+                {
+                    firstCol = srcStrCol.IndexOf("_");
+                    if (firstCol != srcStrCol.Length)
+                    {
+                        newStringCol = newStringCol + srcStrCol.Substring(0, firstCol);
+                        srcStrCol = srcStrCol.Substring(firstCol + 1);
+                        srcStrCol = srcStrCol.Substring(0, 1).ToUpper() + srcStrCol.Substring(1);
+                    }
+                }
+                newStringCol = newStringCol + srcStrCol;
+                tables[tbl.Name][col.Name].PropertyName=newStringCol.Substring(0, 1).ToUpper() + newStringCol.Substring(1); 
+            }
+    }
+    // Generate output
+    if (tables.Count>0)
+    {
+#>
+<#@ include file="PetaPoco.Generator.ttinclude" #>
+<# } #>

@@ -1,0 +1,106 @@
+﻿<#
+if (string.IsNullOrEmpty(Namespace)) Namespace=ConnectionStringName;
+if (string.IsNullOrEmpty(RepoName) && !string.IsNullOrEmpty(ConnectionStringName)) RepoName=ConnectionStringName + "DB";
+if (string.IsNullOrEmpty(Namespace)) Namespace="PetaPoco";
+if (string.IsNullOrEmpty(RepoName)) RepoName="PetaPocoDB";
+#>
+<# if (GeneratePocos) { #>
+<#
+foreach(Table tbl in from t in tables where !t.Ignore select t)
+{
+#>
+/**************************************************************
+*
+* 说明：
+*   以下代码由 Database.tt 自动生成，
+*   任何修改都将因 Database.tt 的重新运行而覆盖丢失。
+*
+**************************************************************/
+using System;
+using BerryInfo.Data;
+using Cassandra.Mapping;
+
+namespace <#=Namespace #>
+{
+<# if (string.IsNullOrEmpty(tbl.Schema)) { #>
+	[TableName("<#=tbl.Name#>")]
+<# } else { #>
+	[TableName("<#=tbl.Schema + "." + tbl.Name#>")]
+<# } #>
+<# if (tbl.PK!=null && tbl.PK.IsAutoIncrement) { #>
+<# if (tbl.SequenceName==null) { #>
+	[PrimaryKey("<#=tbl.PK.Name#>")]
+<# } else { #>
+	[PrimaryKey("<#=tbl.PK.Name#>", sequenceName="<#=tbl.SequenceName#>")]
+<# } #>
+<# } #>
+<# if (tbl.PK!=null && !tbl.PK.IsAutoIncrement) { #>
+	[PrimaryKey("<#=tbl.PK.Name#>", AutoIncrement=false)]
+<# } #>
+<# if (ExplicitColumns) { #>
+	[ExplicitColumns]
+<# } #>
+	public partial class <#=tbl.ClassName#>
+	{
+<#
+foreach(Column col in from c in tbl.Columns where !c.Ignore select c)
+{
+#>
+<# if (TrackModifiedColumns) { #>
+<# if (col.Name!=col.PropertyName) { #>
+		[Column("<#=col.Name#>")] 
+<# } else { #>
+<# if (ExplicitColumns) { #>
+		[Column] 
+<# } #>
+<# } #>
+		public <#=col.PropertyType #><#=CheckNullable(col)#> <#=col.PropertyName #> 
+		{ 
+			get
+			{
+				return _<#=col.PropertyName #>;
+			}
+			set
+			{
+				_<#=col.PropertyName #> = value;
+				MarkColumnModified("<#=col.Name#>");
+			}
+		}
+		<#=col.PropertyType #><#=CheckNullable(col)#> _<#=col.PropertyName #>;
+<# } else { #>
+<# if (col.Name!=col.PropertyName) { #>
+		[Column("<#=col.Name#>")]
+		public <#=col.PropertyType #><#=CheckNullable(col)#> <#=col.PropertyName #> { get; set; }
+<# } else { #>
+		<# if (ExplicitColumns) { #>
+		[Column] <# } #>
+		public <#=col.PropertyType #><#=CheckNullable(col)#> <#=col.PropertyName #> { get; set; }
+<# } #>
+<# } #>
+<# } #>
+	}	
+}
+<# GenerateFile(tbl.ClassName + ".cs"); #>
+<# } #>
+<# } #>
+
+<#+
+  void GenerateFile(string outputFileName)
+  {
+      string templateDirectory = Path.GetDirectoryName(Host.TemplateFile);
+	  string folderPath = Path.Combine(templateDirectory, "T4Generated");
+      string outputFilePath = Path.Combine(templateDirectory, "T4Generated",outputFileName);
+
+	  if (!Directory.Exists(folderPath))
+	  {
+		  Directory.CreateDirectory(folderPath);
+	  } 
+
+	  // 移除所有空白行
+	  string content = Regex.Replace(this.GenerationEnvironment.ToString(), @"^\s*\n", "", RegexOptions.Multiline);
+
+      File.WriteAllText(outputFilePath, content); 
+
+      this.GenerationEnvironment.Remove(0, this.GenerationEnvironment.Length);
+  }
+#>
